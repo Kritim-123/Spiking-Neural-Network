@@ -1,5 +1,7 @@
 import argparse
+from datetime import datetime
 from pathlib import Path
+from tempfile import mkdtemp
 from uuid import uuid4
 
 import mujoco
@@ -143,7 +145,8 @@ def main():
             parser.error("--random requires a scene with wall_west, wall_south, wall_east and wall_north")
         rng = np.random.default_rng(args.seed)
 
-    folder = ROOT / "training_samples" / args.split
+    split_folder = ROOT / "training_samples" / args.split
+    batch_folder = None
     saved = 0
     with mujoco.Renderer(model, height=180, width=320) as renderer:
         for number in range(1, args.count + 1):
@@ -171,13 +174,18 @@ def main():
                 continue
 
             action = KEYS[choice]
-            folder.mkdir(parents=True, exist_ok=True)
-            path = folder / f"{uuid4().hex}.npz"
+            if batch_folder is None:
+                split_folder.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                batch_folder = Path(mkdtemp(prefix=f"batch_{timestamp}_", dir=split_folder))
+            path = batch_folder / f"{uuid4().hex}.npz"
             np.savez_compressed(path, depth=clip, action=np.int64(action))
             saved += 1
             print(f"Saved {ACTIONS[action]}: {path}")
 
     print(f"Session complete. Saved {saved} clip(s).")
+    if batch_folder is not None:
+        print(f"Batch folder: {batch_folder}")
 
 
 if __name__ == "__main__":
