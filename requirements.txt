@@ -2,3 +2,4 @@ torch
 mujoco
 pillow
 numpy
+matplotlib
