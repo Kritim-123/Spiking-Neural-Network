@@ -40,7 +40,7 @@ def main():
             clip = clip.clamp(0.0, 4.0) / 4.0
             clip = F.interpolate(clip, size = (90,160), mode="area")
 
-            snn = SpikingNetwork(input_size = 32, hidden_size = 128, num_classes = 3) ## TODO: Right now this is creating new snn on every itration and scores are coming from freshly initialized weights. Need to load the trained weights here.
+            snn = SpikingNetwork(input_size = 32, hidden_size = 128, num_classes = 4) ## TODO: Right now this is creating new snn on every itration and scores are coming from freshly initialized weights. Need to load the trained weights here.
             depth_encoder.eval()
             snn.eval()
 
