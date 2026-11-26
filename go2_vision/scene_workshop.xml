@@ -1,0 +1,63 @@
+<mujoco model="Go2 workshop navigation">
+  <include file="go2.xml"/>
+
+  <statistic center="1 0 0.5" extent="8"/>
+  <visual>
+    <headlight diffuse="0.35 0.35 0.35" ambient="0.25 0.25 0.25" specular="0.1 0.1 0.1"/>
+    <global azimuth="-115" elevation="-55" offwidth="1440" offheight="1080"/>
+  </visual>
+
+  <asset>
+    <texture name="workshop_floor" type="2d" builtin="checker" width="256" height="256"
+      rgb1="0.46 0.48 0.50" rgb2="0.53 0.55 0.57"/>
+    <material name="concrete" texture="workshop_floor" texuniform="true" texrepeat="1 1"/>
+    <material name="workshop_plaster" rgba="0.78 0.83 0.85 1"/>
+    <material name="workshop_steel" rgba="0.22 0.37 0.41 1"/>
+    <material name="workshop_wood" rgba="0.50 0.32 0.17 1"/>
+  </asset>
+
+  <default>
+    <default class="workshop">
+      <geom type="box" friction="0.8 0.02 0.01" condim="3"/>
+      <default class="workshop_wall">
+        <geom material="workshop_plaster"/>
+      </default>
+      <default class="workshop_crate">
+        <geom material="workshop_wood"/>
+      </default>
+    </default>
+  </default>
+
+  <worldbody>
+    <light pos="1 0 5" dir="0 0 -1" directional="true" diffuse="0.55 0.55 0.55"/>
+    <light pos="4 -2 4" dir="0 0 -1" diffuse="0.25 0.25 0.25" castshadow="false"/>
+    <camera name="overview" pos="1 -11 13" xyaxes="1 0 0 0 0.77 0.64"/>
+    <camera name="top_down" pos="1 0 17" xyaxes="1 0 0 0 1 0"/>
+
+    <!-- Interior bounds in metres: x [-5, 7], y [-4.5, 4.5]. -->
+    <geom name="floor" type="plane" pos="1 0 0" size="6.2 4.7 0.05"
+      material="concrete" friction="0.8 0.02 0.01" condim="3"/>
+    <body name="workshop_layout" childclass="workshop">
+      <geom name="wall_west" class="workshop_wall" pos="-5.08 0 1.15" size="0.08 4.66 1.15"/>
+      <geom name="wall_east" class="workshop_wall" pos="7.08 0 1.15" size="0.08 4.66 1.15"/>
+      <geom name="wall_south" class="workshop_wall" pos="1 -4.58 1.15" size="6 0.08 1.15"/>
+      <geom name="wall_north" class="workshop_wall" pos="1 4.58 1.15" size="6 0.08 1.15"/>
+
+      <!-- From west to east, the route bends left to the first opening, then right to the second. -->
+      <geom name="west_partition_south" class="workshop_wall" pos="-1.35 -2.05 1.15" size="0.08 2.45 1.15"/>
+      <geom name="west_partition_north" class="workshop_wall" pos="-1.35 3.375 1.15" size="0.08 1.125 1.15"/>
+      <geom name="east_partition_south" class="workshop_wall" pos="2.25 -3.375 1.15" size="0.08 1.125 1.15"/>
+      <geom name="east_partition_north" class="workshop_wall" pos="2.25 2.05 1.15" size="0.08 2.45 1.15"/>
+
+      <!-- An open-ended service bay creates a dead-end approach. -->
+      <geom name="bay_west" class="workshop_wall" pos="4.15 3.425 1.15" size="0.08 1.075 1.15"/>
+      <geom name="bay_east" class="workshop_wall" pos="6.15 3.425 1.15" size="0.08 1.075 1.15"/>
+
+      <geom name="supply_cabinet" pos="-4.46 2.55 0.65" size="0.35 0.75 0.65" material="workshop_steel"/>
+      <geom name="receiving_crate" class="workshop_crate" pos="-3.9 -2.65 0.32" size="0.52 0.64 0.32"/>
+      <geom name="aisle_crate" class="workshop_crate" pos="0.55 0.55 0.38" size="0.45 0.55 0.38"/>
+      <geom name="parts_rack" pos="5.38 1.27 0.58" size="0.75 0.33 0.58" material="workshop_steel"/>
+      <geom name="workbench" pos="5.84 -3.55 0.47" size="0.83 0.48 0.47" material="workshop_steel"/>
+    </body>
+  </worldbody>
+</mujoco>
