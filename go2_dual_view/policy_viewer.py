@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 sys.path.insert(0, str(ROOT / "snn"))
 from SpikingNetwork import SpikingNetwork
+from snn.expert_policy import ExpertPolicy
 
 REVERSE_TICKS = 50
 TURN_TICKS = 100
@@ -32,9 +33,13 @@ class PolicyView(DualView):
         self.actions = state["actions"]
 
         self.cnn = depth_encoder
-        self.snn = SpikingNetwork()
-        self.cnn.load_state_dict(state["cnn"])
-        self.snn.load_state_dict(state["snn"])
+        
+        if "expert_policy" in state:
+            self.snn = ExpertPolicy(num_actions=len(self.actions))
+            self.snn.load_state_dict(state["expert_policy"])
+        else:
+            self.snn = SpikingNetwork()
+            self.snn.load_state_dict(state["snn"])
         self.cnn.eval()
         self.snn.eval()
 
