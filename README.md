@@ -38,6 +38,18 @@ Start with one preview to check that the window opens. Press `Q` in the window t
 
 Run these commands from the project folder. The preview opens separately from the terminal, so click the preview if the keys don't respond. The recorder counts skipped previews toward `--count`. Start a new run whenever you want to collect more clips.
 
+To record in the workshop layout, add `--scene go2_vision/scene_workshop.xml` to a random recording command. The workshop has staggered openings, crates, and a dead-end service bay. For example, with your Python environment active:
+
+```powershell
+python record_clips.py --scene go2_vision/scene_workshop.xml --random --count 50
+```
+
+For a larger layout with a loop corridor, offset doorways, furnished rooms, and a blind bay, record in the training center:
+
+```powershell
+python record_clips.py --scene go2_vision/scene_training_center.xml --random --count 50
+```
+
 ## 3. Label the next action
 
 Look at **frame 8**, the bottom-right image, and decide what the robot should do immediately afterward. Use left and right from the robot's point of view.

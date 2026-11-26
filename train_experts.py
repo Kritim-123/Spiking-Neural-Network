@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from cnn.cnn import depth_encoder
 from snn.expert_policy import ExpertPolicy
-from train_policy import ACTIONS, BATCH_SIZE, DepthClips, ROOT, VAL_BATCH
+from train_policy import ACTIONS, BATCH_SIZE, DepthClips, ROOT, split_clips
 
 EXPERT_EPOCHS = 15
 SELECTOR_EPOCHS = 15
@@ -58,19 +58,14 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_root = ROOT / "training_samples" / "train"
-    train_files = sorted(train_root.rglob("*.npz"))
-    val_files = sorted((ROOT / "training_samples" / "val").rglob("*.npz"))
-
-    if not val_files:
-        val_files = sorted((train_root / VAL_BATCH).rglob("*.npz"))
-        val_set = set(val_files)
-        train_files = [path for path in train_files if path not in val_set]
-
-    if not train_files or not val_files:
-        raise ValueError("Need clips in both the training and validation sets.")
+    train_files, val_files, validation_id = split_clips(ROOT / "training_samples")
 
     checkpoint = torch.load(args.cnn_checkpoint, map_location="cpu", weights_only=True)
+    if checkpoint.get("validation_id") != validation_id:
+        parser.error(
+            "CNN checkpoint was not trained with the current validation split. "
+            "Run train_policy.py and pass its new checkpoint to --cnn-checkpoint."
+        )
     cnn = depth_encoder.to(device).eval()
     cnn.load_state_dict(checkpoint["cnn"])
     cnn.requires_grad_(False)
@@ -119,6 +114,7 @@ def main():
                     "cnn": cnn.state_dict(),
                     "expert_policy": policy.state_dict(),
                     "actions": ACTIONS,
+                    "validation_id": validation_id,
                 },
                 output_path,
             )

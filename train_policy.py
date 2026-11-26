@@ -1,4 +1,6 @@
 from pathlib import Path
+from hashlib import sha256
+from random import Random
 import sys
 from datetime import datetime
 from uuid import uuid4
@@ -19,9 +21,42 @@ from SpikingNetwork import SpikingNetwork
 
 ACTIONS = ("forward", "stop", "turn_left", "turn_right")
 
-VAL_BATCH = "batch_2026-11-24_02"
+VALIDATION_FRACTION = 0.20
+SPLIT_SEED = 42
 BATCH_SIZE = 8
 EPOCHS = 15
+
+def split_clips(root):
+    by_action = [[] for _ in ACTIONS]
+    for folder in ("train", "val"):
+        for path in sorted((root / folder).rglob("*.npz")):
+            with np.load(path, allow_pickle=False) as clip:
+                action = int(clip["action"].item())
+            if not 0 <= action < len(ACTIONS):
+                raise ValueError(f"Unknown action {action} in {path}")
+            by_action[action].append(path)
+
+    rng = Random(SPLIT_SEED)
+    train_files, val_files = [], []
+    for files in by_action:
+        rng.shuffle(files)
+        val_count = 0
+        if len(files) >= 2:
+            val_count = min(len(files) - 1, max(1, round(len(files) * VALIDATION_FRACTION)))
+        val_files.extend(files[:val_count])
+        train_files.extend(files[val_count:])
+
+    if not train_files or not val_files:
+        raise ValueError("Need clips in both the training and validation sets")
+
+    # Identify the holdout so experts can reuse a CNN trained with this split.
+    validation = sha256()
+    for path in sorted(val_files):
+        validation.update(path.relative_to(root).as_posix().encode("utf-8") + b"\0")
+        validation.update(sha256(path.read_bytes()).digest())
+
+    return train_files, val_files, validation.hexdigest()
+
 
 class DepthClips(Dataset):
     def __init__(self, files):
@@ -82,19 +117,7 @@ def run_epoch(loader, cnn, snn, device, optimizer=None):
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_root = ROOT / "training_samples" / "train"
-    val_root = ROOT / "training_samples" / "val"
-
-    train_files = sorted(train_root.rglob("*.npz"))
-    val_files = sorted(val_root.rglob("*.npz"))
-
-    if not val_files:
-        val_files = sorted((train_root / VAL_BATCH).rglob("*.npz"))
-        val_set = set(val_files)
-        train_files = [path for path in train_files if path not in val_set]
-
-    if not train_files or not val_files:
-        raise ValueError("Need clips in both the training and validation sets")
+    train_files, val_files, validation_id = split_clips(ROOT / "training_samples")
 
     train_loader = DataLoader(DepthClips(train_files), batch_size= BATCH_SIZE, shuffle= True)
     val_loader = DataLoader(DepthClips(val_files), batch_size = BATCH_SIZE)
@@ -128,7 +151,12 @@ def main():
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(
-                {"cnn": cnn.state_dict(), "snn": snn.state_dict(), "actions": ACTIONS},
+                {
+                    "cnn": cnn.state_dict(),
+                    "snn": snn.state_dict(),
+                    "actions": ACTIONS,
+                    "validation_id": validation_id,
+                },
                 checkpoint
             )
             scores = ",".join(
