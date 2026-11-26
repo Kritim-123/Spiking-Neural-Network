@@ -1,0 +1,91 @@
+<mujoco model="Go2 training center">
+  <include file="go2.xml"/>
+
+  <statistic center="0 0 0.5" extent="10"/>
+  <visual>
+    <headlight diffuse="0.36 0.37 0.40" ambient="0.32 0.32 0.32" specular="0.08 0.08 0.08"/>
+    <global azimuth="-115" elevation="-55" offwidth="1440" offheight="1080"/>
+  </visual>
+
+  <asset>
+    <texture name="center_tiles" type="2d" builtin="checker" width="256" height="256"
+      rgb1="0.46 0.48 0.51" rgb2="0.53 0.55 0.58"/>
+    <material name="center_floor" texture="center_tiles" texuniform="true" texrepeat="1 1"/>
+    <material name="center_wall" rgba="0.87 0.90 0.89 1"/>
+    <material name="center_wood" rgba="0.58 0.35 0.18 1"/>
+    <material name="center_teal" rgba="0.17 0.46 0.46 1"/>
+    <material name="center_blue" rgba="0.24 0.36 0.54 1"/>
+  </asset>
+
+  <default>
+    <default class="training_center">
+      <geom type="box" friction="0.8 0.02 0.01" condim="3"/>
+      <default class="partition">
+        <geom material="center_wall"/>
+      </default>
+      <default class="crate">
+        <geom material="center_wood"/>
+      </default>
+    </default>
+  </default>
+
+  <worldbody>
+    <light pos="-4 -4 7" dir="0 0 -1" directional="true" diffuse="0.52 0.51 0.47"/>
+    <light pos="5 3 6" dir="0 0 -1" diffuse="0.32 0.35 0.40" castshadow="false"/>
+    <camera name="overview" pos="0 -16 16" xyaxes="1 0 0 0 1 1" fovy="42"/>
+    <camera name="top_down" pos="0 0 22" xyaxes="1 0 0 0 1 0" fovy="35"/>
+
+    <!-- Interior bounds: x [-7.5, 7.5], y [-5.5, 5.5]. Sizes are half extents. -->
+    <geom name="floor" type="plane" size="7.7 5.7 0.05" material="center_floor"
+      friction="0.8 0.02 0.01" condim="3"/>
+    <body name="training_center_layout" childclass="training_center">
+      <geom name="wall_west" class="partition" pos="-7.59 0 1.1" size="0.09 5.68 1.1"/>
+      <geom name="wall_east" class="partition" pos="7.59 0 1.1" size="0.09 5.68 1.1"/>
+      <geom name="wall_south" class="partition" pos="0 -5.59 1.1" size="7.5 0.09 1.1"/>
+      <geom name="wall_north" class="partition" pos="0 5.59 1.1" size="7.5 0.09 1.1"/>
+
+      <!-- Four offset doorways connect the central lab to the loop corridor. -->
+      <geom name="lab_west_lower" class="partition" pos="-2.5 -1.5 1.1" size="0.09 0.3 1.1"/>
+      <geom name="lab_west_upper" class="partition" pos="-2.5 1 1.1" size="0.09 0.8 1.1"/>
+      <geom name="lab_east_lower" class="partition" pos="2.5 -0.875 1.1" size="0.09 0.925 1.1"/>
+      <geom name="lab_east_upper" class="partition" pos="2.5 1.6 1.1" size="0.09 0.2 1.1"/>
+      <geom name="lab_north_left" class="partition" pos="-1.025 1.8 1.1" size="1.475 0.09 1.1"/>
+      <geom name="lab_north_right" class="partition" pos="2.2 1.8 1.1" size="0.3 0.09 1.1"/>
+      <geom name="lab_south_left" class="partition" pos="-2.2 -1.8 1.1" size="0.3 0.09 1.1"/>
+      <geom name="lab_south_right" class="partition" pos="1 -1.8 1.1" size="1.5 0.09 1.1"/>
+
+      <!-- Three rooms off the north corridor. -->
+      <geom name="north_wall_1" class="partition" pos="-5.925 3.65 1.1" size="1.575 0.09 1.1"/>
+      <geom name="north_wall_2" class="partition" pos="-1.475 3.65 1.1" size="1.575 0.09 1.1"/>
+      <geom name="north_wall_3" class="partition" pos="2.975 3.65 1.1" size="1.475 0.09 1.1"/>
+      <geom name="north_wall_4" class="partition" pos="6.725 3.65 1.1" size="0.775 0.09 1.1"/>
+      <geom name="north_divider_1" class="partition" pos="-1.8 4.575 1.1" size="0.09 0.925 1.1"/>
+      <geom name="north_divider_2" class="partition" pos="3.1 4.575 1.1" size="0.09 0.925 1.1"/>
+
+      <!-- Three south rooms have doors offset from the north rooms. -->
+      <geom name="south_wall_1" class="partition" pos="-6.65 -3.65 1.1" size="0.85 0.09 1.1"/>
+      <geom name="south_wall_2" class="partition" pos="-2.5 -3.65 1.1" size="1.8 0.09 1.1"/>
+      <geom name="south_wall_3" class="partition" pos="2.65 -3.65 1.1" size="1.95 0.09 1.1"/>
+      <geom name="south_wall_4" class="partition" pos="6.8 -3.65 1.1" size="0.7 0.09 1.1"/>
+      <geom name="south_divider_1" class="partition" pos="-2.8 -4.575 1.1" size="0.09 0.925 1.1"/>
+      <geom name="south_divider_2" class="partition" pos="2 -4.575 1.1" size="0.09 0.925 1.1"/>
+
+      <!-- An east-facing blind bay has a clear entrance and a solid end wall. -->
+      <geom name="bay_south" class="partition" pos="6.35 -0.75 1.1" size="1.15 0.09 1.1"/>
+      <geom name="bay_north" class="partition" pos="6.35 1.45 1.1" size="1.15 0.09 1.1"/>
+
+      <geom name="lab_bench" pos="0.82 -0.64 0.43" size="0.85 0.30 0.43" euler="0 0 0.32" material="center_teal"/>
+      <geom name="lab_crate" class="crate" pos="-0.85 0.94 0.31" size="0.37 0.33 0.31"/>
+      <geom name="west_cart" pos="-4.88 0.9 0.38" size="0.65 0.32 0.38" euler="0 0 -0.45" material="center_blue"/>
+      <geom name="west_pallet" class="crate" pos="-6.2 -1.68 0.26" size="0.57 0.53 0.26" euler="0 0 0.25"/>
+      <geom name="east_column" type="cylinder" pos="4.25 2.58 0.65" size="0.26 0.65" material="center_blue"/>
+      <geom name="east_crate" class="crate" pos="6.68 -2.10 0.34" size="0.44 0.52 0.34" euler="0 0 0.35"/>
+      <geom name="north_cabinet" pos="-6.32 5.12 0.62" size="0.78 0.35 0.62" material="center_teal"/>
+      <geom name="north_storage" class="crate" pos="2.27 4.9 0.29" size="0.43 0.38 0.29"/>
+      <geom name="north_shelving" pos="3.78 4.96 0.67" size="0.34 0.42 0.67" material="center_blue"/>
+      <geom name="south_bench" pos="-3.55 -5.02 0.42" size="0.6 0.32 0.42" material="center_teal"/>
+      <geom name="south_crate" class="crate" pos="-1.9 -4.9 0.35" size="0.4 0.42 0.35"/>
+      <geom name="south_cabinet" pos="6.58 -4.96 0.58" size="0.58 0.35 0.58" material="center_blue"/>
+    </body>
+  </worldbody>
+</mujoco>
