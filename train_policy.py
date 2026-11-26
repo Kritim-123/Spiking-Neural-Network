@@ -120,22 +120,22 @@ def main():
         val_loss, counts = run_epoch(val_loader, cnn, snn, device)
         val_accuracy = counts.diag().sum().item() / len (val_files)
 
-    print(
-        f"Epoch {epoch:02d} | train loss {train_loss:.3f} |"
-        f"val loss {val_loss:.3f} | val accuracy {val_accuracy:.1%}"
-    )
+        print(
+            f"Epoch {epoch:02d} | train loss {train_loss:.3f} |"
+            f"val loss {val_loss:.3f} | val accuracy {val_accuracy:.1%}"
+        )
 
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        torch.save(
-            {"cnn": cnn.state_dict(), "snn": snn.state_dict(), "actions": ACTIONS},
-            checkpoint
-        )
-        scores = ",".join(
-            f"{name} {counts[i,i].item()}/{counts[i].sum().item()}"
-            for i,name in enumerate(ACTIONS)
-        )
-        print(f" Saved {checkpoint.name} | correct/total: {scores}")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(
+                {"cnn": cnn.state_dict(), "snn": snn.state_dict(), "actions": ACTIONS},
+                checkpoint
+            )
+            scores = ",".join(
+                f"{name} {counts[i,i].item()}/{counts[i].sum().item()}"
+                for i,name in enumerate(ACTIONS)
+            )
+            print(f" Saved {checkpoint.name} | correct/total: {scores}")
 
 if __name__ == "__main__":
     main()
