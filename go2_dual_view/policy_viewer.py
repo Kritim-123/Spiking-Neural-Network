@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "snn"))
 from SpikingNetwork import SpikingNetwork
 
+REVERSE_TICKS = 50
+TURN_TICKS = 100
 
 class PolicyView(DualView):
     def __init__(self, window, checkpoint):
@@ -47,6 +49,7 @@ class PolicyView(DualView):
         self.features = deque(maxlen=8)
         self.action = "stop"
         self.tick = 0
+        self.recovery_ticks = 0
 
         self.status = ttk.Label(window, text="Collecting 8 frames...")
         self.status.pack(pady=6)
@@ -68,6 +71,8 @@ class PolicyView(DualView):
             sequence = torch.stack(tuple(self.features)).unsqueeze(0)
             scores = self.snn(sequence)[0]
             self.action = self.actions[scores.argmax().item()]
+            if self.action == "stop":
+                self.recovery_ticks = REVERSE_TICKS + TURN_TICKS
             self.status.configure(text=f"SNN action: {self.action}")
 
     def update_simulation(self):
@@ -75,12 +80,27 @@ class PolicyView(DualView):
 
         # Apply two 20 ms pose updates per screen refresh.
         for _ in range(2):
-            if self.tick % 12 == 0:
+            if self.recovery_ticks == 0 and self.tick % 12 == 0:
                 self.update_action()
 
-            command = COMMANDS[self.action]
-            apply_pose_command(self.model, self.data, command, dt=0.02)
+            if self.recovery_ticks > TURN_TICKS:
+                movement = "reverse"
+            elif self.recovery_ticks > 0:
+                movement = "turn_right"
+            else:
+                movement = self.action
+
+            apply_pose_command(self.model, self.data, COMMANDS[movement], dt=0.02)
             self.tick += 1
+
+            if self.recovery_ticks > 0:
+                self.status.configure(text=f"SNN: stop | Recovery: {movement}")
+                self.recovery_ticks -=1
+
+                if self.recovery_ticks == 0:
+                    self.features.clear()
+                    self.action = "stop"
+                    self.status.configure(text="Collecting 8 fresh frames...")
 
         self.display(self.global_view, self.global_renderer, self.camera)
         self.display(self.head_view, self.head_renderer, "front_cam")
