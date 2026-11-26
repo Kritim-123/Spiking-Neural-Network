@@ -4,7 +4,7 @@ from torch import nn
 from lif_step import lif_step
 
 class SpikingNetwork(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+    def __init__(self, input_size = 32, hidden_size = 128, num_classes = 4):
         super().__init__()
         self.input_layer = nn.Linear(input_size, hidden_size)
         self.readout = nn.Linear(hidden_size, num_classes)
