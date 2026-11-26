@@ -1,4 +1,5 @@
 import argparse
+from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 from tempfile import mkdtemp
@@ -70,15 +71,50 @@ def capture_clip(renderer, model, data, positions):
     return np.stack(frames).astype(np.float32)
 
 
-def label_clip(clip, number, count):
+def capture_overhead(renderer, model, data):
+    camera = "top_down"
+    if mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, camera) < 0:
+        camera = mujoco.MjvCamera()
+        mujoco.mjv_defaultCamera(camera)
+        camera.lookat[:] = model.stat.center
+        camera.distance = 2.5 * model.stat.extent
+        camera.azimuth = 90
+        camera.elevation = -89
+
+    renderer.update_scene(data, camera=camera)
+    scene = renderer.scene
+    if scene.ngeom < scene.maxgeom:
+        base = data.body("base")
+        origin = base.xpos + np.array([0.0, 0.0, 0.27])
+        tip = origin + 0.85 * base.xmat.reshape(3, 3)[:, 0]
+        arrow = scene.geoms[scene.ngeom]
+        mujoco.mjv_initGeom(
+            arrow, mujoco.mjtGeom.mjGEOM_ARROW, np.zeros(3), origin,
+            np.eye(3).ravel(), np.array([0.05, 0.85, 0.75, 1.0], dtype=np.float32),
+        )
+        mujoco.mjv_connector(arrow, mujoco.mjtGeom.mjGEOM_ARROW, 0.06, origin, tip)
+        scene.ngeom += 1
+
+    return renderer.render()
+
+
+def label_clip(clip, overhead, number, count):
     import matplotlib.pyplot as plt
 
     choice = None
     with plt.rc_context({"keymap.save": [], "keymap.quit": []}):
-        fig, axes = plt.subplots(2, 4, figsize=(12, 5))
-        for i, (ax, frame) in enumerate(zip(axes.flat, clip), start=1):
+        fig = plt.figure(figsize=(14, 5.6))
+        grid = fig.add_gridspec(2, 6, width_ratios=(1.25, 1.25, 1, 1, 1, 1))
+        overview = fig.add_subplot(grid[:, :2])
+        overview.imshow(overhead)
+        overview.set_title("Top view at frame 8 | Arrow shows heading")
+        overview.axis("off")
+
+        for i, frame in enumerate(clip, start=1):
+            row, column = divmod(i - 1, 4)
+            ax = fig.add_subplot(grid[row, column + 2])
             ax.imshow(frame, cmap="gray", vmin=0.0, vmax=4.0)
-            ax.set_title(f"Frame {i}")
+            ax.set_title(f"Frame {i}", weight="bold" if i == FRAME_COUNT else "normal")
             ax.axis("off")
 
         def select_action(event):
@@ -148,7 +184,14 @@ def main():
     split_folder = ROOT / "training_samples" / args.split
     batch_folder = None
     saved = 0
-    with mujoco.Renderer(model, height=180, width=320) as renderer:
+    with ExitStack() as renderers:
+        renderer = renderers.enter_context(mujoco.Renderer(model, height=180, width=320))
+        if not args.predict:
+            overhead_renderer = renderers.enter_context(mujoco.Renderer(
+                model,
+                height=min(400, model.vis.global_.offheight),
+                width=min(600, model.vis.global_.offwidth),
+            ))
         for number in range(1, args.count + 1):
             mujoco.mj_resetDataKeyframe(model, data, home)
             if args.random:
@@ -166,7 +209,8 @@ def main():
                 predict(clip)
                 return
 
-            choice = label_clip(clip, number, args.count)
+            overhead = capture_overhead(overhead_renderer, model, data)
+            choice = label_clip(clip, overhead, number, args.count)
             if choice is None:
                 break
             if choice == "q":

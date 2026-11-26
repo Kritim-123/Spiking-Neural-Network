@@ -1,5 +1,7 @@
 import argparse
 from pathlib import Path
+import subprocess
+import sys
 from uuid import uuid4
 
 import torch
@@ -55,6 +57,8 @@ def train_expert(expert, features, labels):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cnn-checkpoint", required=True, type=Path)
+    parser.add_argument("--preview", action="store_true", help="Watch saved expert checkpoints in MuJoCo")
+    parser.add_argument("--preview-scene", type=Path, help="Scene for the MuJoCo preview")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -90,7 +94,9 @@ def main():
     output_dir = ROOT / "checkpoints"
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"expert_policy_{uuid4().hex}.pt"
+    temporary_path = output_path.with_suffix(".tmp")
     best_loss = float("inf")
+    preview = None
 
     for epoch in range(1, SELECTOR_EPOCHS + 1):
         for rates, labels in loader:
@@ -115,9 +121,23 @@ def main():
                     "expert_policy": policy.state_dict(),
                     "actions": ACTIONS,
                     "validation_id": validation_id,
+                    "selector_epoch": epoch,
                 },
-                output_path,
+                temporary_path,
             )
+            temporary_path.replace(output_path)
+            if args.preview and preview is None:
+                command = [
+                    sys.executable, "-m", "go2_dual_view.policy_viewer",
+                    "--checkpoint", str(output_path), "--follow-checkpoint",
+                ]
+                if args.preview_scene is not None:
+                    command.extend(["--scene", str(args.preview_scene.resolve())])
+                preview = subprocess.Popen(
+                    command, cwd=ROOT, stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
             for i, action in enumerate(ACTIONS):
                 mask = val_y == i
                 print(f"  {action}: {correct[mask].sum().item()}/{mask.sum().item()}")
