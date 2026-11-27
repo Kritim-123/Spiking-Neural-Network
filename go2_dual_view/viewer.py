@@ -9,14 +9,16 @@ from PIL import Image, ImageTk
 
 
 class DualView:
-    def __init__(self, window):
+    def __init__(self, window, scene_path=None, waypoint=None):
         self.window = window
-        scene_path = Path(__file__).resolve().parent.parent / "go2_vision" / "scene_indoor.xml"
-        self.model = mujoco.MjModel.from_xml_path(str(scene_path))
+        self.waypoint = waypoint
+        default_scene = Path(__file__).resolve().parent.parent / "go2_vision" / "scene_indoor.xml"
+        self.model = mujoco.MjModel.from_xml_path(str(scene_path or default_scene))
         self.data = mujoco.MjData(self.model)
         mujoco.mj_resetDataKeyframe(self.model, self.data, self.model.key("home").id)
         # Match the pose used for the original head-camera demo.
-        self.data.qpos[0] = 4.55
+        if scene_path is None:
+            self.data.qpos[0] = 4.55
         mujoco.mj_forward(self.model, self.data)
         self.camera = mujoco.MjvCamera()
         mujoco.mjv_defaultCamera(self.camera)
@@ -24,9 +26,9 @@ class DualView:
 
         panels = ttk.Frame(window, padding=12)
         panels.pack()
-        global_panel = ttk.LabelFrame(panels, text="Global view", padding=6)
+        self.global_panel = global_panel = ttk.LabelFrame(panels, text="Global view", padding=6)
         global_panel.grid(row=0, column=0, sticky="n", padx=(0, 10))
-        head_panel = ttk.LabelFrame(panels, text="Go2 head camera", padding=6)
+        self.head_panel = head_panel = ttk.LabelFrame(panels, text="Go2 head camera", padding=6)
         head_panel.grid(row=0, column=1, sticky="n")
 
         self.global_view = ttk.Label(global_panel)
@@ -50,19 +52,23 @@ class DualView:
 
     def display(self, label, renderer, camera):
         renderer.update_scene(self.data, camera=camera)
+        if self.waypoint is not None and label is self.global_view:
+            from go2_vision.waypoint import draw_waypoint
+
+            draw_waypoint(renderer.scene, self.waypoint)
         label.frame_image = ImageTk.PhotoImage(Image.fromarray(renderer.render()), master=self.window)
         label.configure(image=label.frame_image)
 
     def show_robot(self):
-        self.camera.lookat[:] = [4.75, -0.37, 0.15]
+        self.camera.lookat[:] = self.data.qpos[:3]
         self.camera.distance = 3.9
         self.camera.azimuth = 90
         self.camera.elevation = -88
         self.display(self.global_view, self.global_renderer, self.camera)
 
     def show_room(self):
-        self.camera.lookat[:] = [2, 0, 0]
-        self.camera.distance = 17
+        self.camera.lookat[:] = self.model.stat.center
+        self.camera.distance = 2.4 * self.model.stat.extent
         self.camera.azimuth = 90
         self.camera.elevation = -89
         self.display(self.global_view, self.global_renderer, self.camera)

@@ -9,6 +9,7 @@ import mujoco
 import numpy as np
 
 from go2_vision.capture_camera import capture_frames
+from go2_vision.waypoint import draw_waypoint, waypoint_features
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SCENE = ROOT / "go2_vision" / "scene_indoor.xml"
@@ -71,7 +72,7 @@ def capture_clip(renderer, model, data, positions):
     return np.stack(frames).astype(np.float32)
 
 
-def capture_overhead(renderer, model, data):
+def capture_overhead(renderer, model, data, goal=None):
     camera = "top_down"
     if mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, camera) < 0:
         camera = mujoco.MjvCamera()
@@ -95,10 +96,12 @@ def capture_overhead(renderer, model, data):
         mujoco.mjv_connector(arrow, mujoco.mjtGeom.mjGEOM_ARROW, 0.06, origin, tip)
         scene.ngeom += 1
 
+    if goal is not None:
+        draw_waypoint(scene, goal)
     return renderer.render()
 
 
-def label_clip(clip, overhead, number, count):
+def label_clip(clip, overhead, number, count, goal=None):
     import matplotlib.pyplot as plt
 
     choice = None
@@ -126,7 +129,10 @@ def label_clip(clip, overhead, number, count):
                 plt.close(fig)
 
         fig.canvas.mpl_connect("key_press_event", select_action)
-        fig.suptitle(f"Clip {number}/{count} — What should the robot do after frame 8?")
+        title = f"Clip {number}/{count} - What should the robot do after frame 8?"
+        if goal is not None:
+            title += f" | Gold waypoint ({goal[0]:g}, {goal[1]:g})"
+        fig.suptitle(title)
         fig.supxlabel("W Forward   S Stop   A Left   D Right   Q Skip   Esc Finish")
         fig.tight_layout()
         plt.show()
@@ -162,6 +168,8 @@ def main():
     parser.add_argument("--count", type=int, default=1, help="Number of clips to preview, including skips.")
     parser.add_argument("--seed", type=int, help="Optional seed for reproducible random clips.")
     parser.add_argument("--split", choices=("train", "val"), default="train")
+    parser.add_argument("--goal", nargs=2, type=float, action="append", metavar=("X", "Y"),
+                        help="Label a waypoint at (X, Y); repeat to label the same clip for multiple goals")
     parser.add_argument("--predict", action="store_true")
     args = parser.parse_args()
     if args.count < 1:
@@ -170,6 +178,8 @@ def main():
         parser.error("--count greater than 1 requires --random without --predict")
     if args.seed is not None and (not args.random or args.seed < 0):
         parser.error("--seed requires --random and a nonnegative integer")
+    if args.goal and (args.predict or not np.isfinite(args.goal).all()):
+        parser.error("--goal requires finite coordinates and recording mode")
 
     model = mujoco.MjModel.from_xml_path(str(args.scene))
     data = mujoco.MjData(model)
@@ -181,7 +191,17 @@ def main():
             parser.error("--random requires a scene with wall_west, wall_south, wall_east and wall_north")
         rng = np.random.default_rng(args.seed)
 
-    split_folder = ROOT / "training_samples" / args.split
+    if args.goal:
+        try:
+            lower, upper = room_bounds(model)
+        except KeyError:
+            pass  # Custom scenes without named boundary walls can still record fixed poses.
+        else:
+            if np.any(np.asarray(args.goal) <= lower) or np.any(np.asarray(args.goal) >= upper):
+                parser.error("waypoints must be inside the room")
+
+    dataset = "waypoint_samples" if args.goal else "training_samples"
+    split_folder = ROOT / dataset / args.split
     batch_folder = None
     saved = 0
     with ExitStack() as renderers:
@@ -209,23 +229,40 @@ def main():
                 predict(clip)
                 return
 
-            overhead = capture_overhead(overhead_renderer, model, data)
-            choice = label_clip(clip, overhead, number, args.count)
-            if choice is None:
-                break
-            if choice == "q":
+            labels, goals, features = [], [], []
+            for goal in args.goal or [None]:
+                overhead = capture_overhead(overhead_renderer, model, data, goal)
+                choice = label_clip(clip, overhead, number, args.count, goal)
+                if choice is None:
+                    break
+                if choice in KEYS:
+                    labels.append(KEYS[choice])
+                    if goal is not None:
+                        goals.append(goal)
+                        features.append(waypoint_features(data, goal))
+
+            if not labels:
+                if choice is None:
+                    break
                 print("Clip skipped.")
                 continue
 
-            action = KEYS[choice]
             if batch_folder is None:
                 split_folder.mkdir(parents=True, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 batch_folder = Path(mkdtemp(prefix=f"batch_{timestamp}_", dir=split_folder))
             path = batch_folder / f"{uuid4().hex}.npz"
-            np.savez_compressed(path, depth=clip, action=np.int64(action))
+            if args.goal:
+                np.savez_compressed(
+                    path, depth=clip, action=np.asarray(labels, dtype=np.int64),
+                    goals=np.asarray(goals, dtype=np.float32), goal_features=np.stack(features),
+                )
+            else:
+                np.savez_compressed(path, depth=clip, action=np.int64(labels[0]))
             saved += 1
-            print(f"Saved {ACTIONS[action]}: {path}")
+            print(f"Saved {', '.join(ACTIONS[action] for action in labels)}: {path}")
+            if choice is None:
+                break
 
     print(f"Session complete. Saved {saved} clip(s).")
     if batch_folder is not None:
