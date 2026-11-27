@@ -50,9 +50,15 @@ For a larger layout with a loop corridor, offset doorways, furnished rooms, and 
 python record_clips.py --scene go2_vision/scene_training_center.xml --random --count 50
 ```
 
+For a harder layout with angled racks, narrow gates, blind loading bays, and low pallets, use the warehouse:
+
+```powershell
+python record_clips.py --scene go2_vision/scene_warehouse.xml --random --count 50
+```
+
 ## 3. Label the next action
 
-Look at **frame 8**, the bottom-right image, and decide what the robot should do immediately afterward. Use left and right from the robot's point of view.
+Look at **frame 8**, the bottom-right depth image, and decide what the robot should do immediately afterward. The overhead panel shows the robot's position at frame 8. Its arrow shows the direction it faces. Use left and right from the robot's point of view.
 
 | Key | Action | When to use it |
 | --- | --- | --- |
@@ -64,6 +70,25 @@ Look at **frame 8**, the bottom-right image, and decide what the robot should do
 | `Esc` | Finish | End the session and keep everything you've saved so far. |
 
 Use the same labeling rules for each batch. A saved sample is an `.npz` file containing eight depth frames and one action label.
+
+## Record and train waypoint navigation
+
+Set one or more goal coordinates in world meters. Each gold marker appears in the overhead view. Repeat `--goal` to label the same depth clip for different destinations, one prompt at a time. For each prompt, choose the immediate action toward the marked goal. If a wall blocks the direct route, label the next action along a clear detour. Use `S` when the robot has arrived or should hold, and `Q` to skip the current goal.
+
+```powershell
+python .\record_clips.py --scene .\go2_vision\scene_training_center.xml --random --count 50 --goal 0 2.7 --goal 0 -2.7
+```
+
+Waypoint clips go to `waypoint_samples/train/`. Targets sharing a depth clip stay together in the train/validation split. Use `--split val` when recording an independent validation set. Without separate validation recordings, the trainer holds out 20% of the distinct depth clips.
+
+Train only the new selector using an existing three-expert checkpoint. Replace the example names with the filenames from your runs.
+
+```powershell
+python .\train_waypoint.py --expert-checkpoint .\checkpoints\expert_policy_YOUR_RUN.pt
+python -m go2_dual_view.policy_viewer --checkpoint .\checkpoints\waypoint_policy_YOUR_RUN.pt --scene .\go2_vision\scene_training_center.xml --goal 0 2.7
+```
+
+The viewer displays the distance to the goal and stops within 25 cm. Use the same scene and varied goals to check whether the policy reaches its destination. The selector learns local movement decisions from your labels and can get stuck on routes it has not learned.
 
 ## 4. Share the batch
 
