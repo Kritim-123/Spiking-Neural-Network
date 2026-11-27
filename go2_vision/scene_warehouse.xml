@@ -1,0 +1,92 @@
+<mujoco model="Go2 warehouse navigation">
+  <include file="go2.xml"/>
+
+  <statistic center="0 0 0.5" extent="11"/>
+  <visual>
+    <headlight diffuse="0.35 0.37 0.40" ambient="0.28 0.28 0.28" specular="0.10 0.10 0.10"/>
+    <global azimuth="-115" elevation="-55" offwidth="1440" offheight="1080"/>
+  </visual>
+
+  <asset>
+    <texture name="warehouse_tiles" type="2d" builtin="checker" width="256" height="256"
+      rgb1="0.45 0.47 0.50" rgb2="0.53 0.55 0.58"/>
+    <material name="warehouse_floor" texture="warehouse_tiles" texuniform="true" texrepeat="1 1"/>
+    <material name="warehouse_wall" rgba="0.83 0.86 0.88 1"/>
+    <material name="warehouse_rack" rgba="0.22 0.40 0.53 1"/>
+    <material name="warehouse_box" rgba="0.60 0.37 0.19 1"/>
+    <material name="warehouse_post" rgba="0.92 0.64 0.19 1"/>
+  </asset>
+
+  <default>
+    <default class="warehouse">
+      <geom type="box" friction="0.8 0.02 0.01" condim="3"/>
+      <default class="warehouse_partition">
+        <geom material="warehouse_wall"/>
+      </default>
+      <default class="warehouse_storage">
+        <geom material="warehouse_rack"/>
+      </default>
+      <default class="warehouse_cargo">
+        <geom material="warehouse_box"/>
+      </default>
+      <default class="warehouse_bollard">
+        <geom type="cylinder" size="0.16 0.38" material="warehouse_post"/>
+      </default>
+    </default>
+  </default>
+
+  <worldbody>
+    <light pos="-5 -4 7" dir="0 0 -1" directional="true" diffuse="0.52 0.51 0.48"/>
+    <light pos="5 3 6" dir="0 0 -1" diffuse="0.32 0.35 0.40" castshadow="false"/>
+    <camera name="overview" pos="0 -18 18" xyaxes="1 0 0 0 1 1" fovy="42"/>
+    <camera name="top_down" pos="0 0 24" xyaxes="1 0 0 0 1 0" fovy="36"/>
+    <geom name="floor" type="plane" size="8.7 6.2 0.05" material="warehouse_floor"
+      friction="0.8 0.02 0.01" condim="3"/>
+
+    <body name="warehouse_layout" childclass="warehouse">
+      <!-- Interior bounds: x [-8.5, 8.5], y [-6, 6]. Box sizes are half extents. -->
+      <geom name="wall_west" class="warehouse_partition" pos="-8.59 0 1.15" size="0.09 6.18 1.15"/>
+      <geom name="wall_east" class="warehouse_partition" pos="8.59 0 1.15" size="0.09 6.18 1.15"/>
+      <geom name="wall_south" class="warehouse_partition" pos="0 -6.09 1.15" size="8.5 0.09 1.15"/>
+      <geom name="wall_north" class="warehouse_partition" pos="0 6.09 1.15" size="8.5 0.09 1.15"/>
+
+      <!-- Offset 1.3 m openings at the north and south ends of the central junction. -->
+      <geom name="north_gate_left" class="warehouse_partition" pos="-1.30 2.15 0.9" size="0.70 0.10 0.90"/>
+      <geom name="north_gate_right" class="warehouse_partition" pos="1.30 2.15 0.9" size="0.60 0.10 0.90"/>
+      <geom name="south_gate_left" class="warehouse_partition" pos="-0.925 -2.25 0.9" size="0.975 0.10 0.90"/>
+      <geom name="south_gate_right" class="warehouse_partition" pos="1.70 -2.25 0.9" size="0.35 0.10 0.90"/>
+
+      <!-- Uneven rack ends expose different gaps from each side of the main aisle. -->
+      <geom name="northwest_rack_1" class="warehouse_storage" pos="-6.55 3.65 0.9" size="0.37 1.55 0.90"/>
+      <geom name="northwest_rack_2" class="warehouse_storage" pos="-4.58 3.95 0.55" size="0.38 1.58 0.55"/>
+      <geom name="northwest_rack_3" class="warehouse_storage" pos="-2.72 3.45 0.76" size="0.32 1.32 0.76"/>
+      <geom name="northeast_rack_1" class="warehouse_storage" pos="2.68 3.77 0.82" size="0.34 1.44 0.82" euler="0 0 -0.20"/>
+      <geom name="northeast_rack_2" class="warehouse_storage" pos="4.70 4.15 0.76" size="0.40 1.29 0.76" euler="0 0 0.25"/>
+      <geom name="northeast_rack_3" class="warehouse_storage" pos="6.68 3.84 0.91" size="0.39 1.30 0.91" euler="0 0 -0.18"/>
+
+      <!-- Loading alcoves face into the main aisle and end against the perimeter. -->
+      <geom name="west_bay_north" class="warehouse_partition" pos="-7.65 0.95 1.00" size="0.85 0.09 1.00"/>
+      <geom name="west_bay_south" class="warehouse_partition" pos="-7.65 -1.0 1.00" size="0.85 0.09 1.00"/>
+      <geom name="east_bay_north" class="warehouse_partition" pos="7.60 1.10 1.00" size="0.90 0.09 1.00"/>
+      <geom name="east_bay_south" class="warehouse_partition" pos="7.60 -1.15 1.00" size="0.90 0.09 1.00"/>
+
+      <!-- Angled benches and freestanding cargo make the south routes less regular. -->
+      <geom name="packing_bench_west" class="warehouse_storage" pos="-4.38 -3.56 0.43" size="1.23 0.39 0.43" euler="0 0 0.58"/>
+      <geom name="packing_bench_east" class="warehouse_storage" pos="4.72 -3.56 0.47" size="1.22 0.42 0.47" euler="0 0 -0.55"/>
+      <geom name="southwest_stack" class="warehouse_cargo" pos="-6.74 -3.92 0.52" size="0.59 0.63 0.52" euler="0 0 0.25"/>
+      <geom name="southeast_stack" class="warehouse_cargo" pos="6.95 -4.21 0.56" size="0.61 0.60 0.56" euler="0 0 -0.28"/>
+      <geom name="sort_divider" class="warehouse_partition" pos="0.25 -4.14 0.65" size="0.93 0.10 0.65" euler="0 0 0.32"/>
+      <geom name="south_pallet" class="warehouse_cargo" pos="-2.27 -4.97 0.22" size="0.57 0.46 0.22" euler="0 0 -0.30"/>
+      <geom name="north_pallet" class="warehouse_cargo" pos="-3.54 5.55 0.31" size="0.41 0.36 0.31"/>
+      <geom name="west_staging_box" class="warehouse_cargo" pos="-5.31 1.53 0.34" size="0.42 0.34 0.34" euler="0 0 -0.29"/>
+      <geom name="east_staging_box" class="warehouse_cargo" pos="5.65 -1.62 0.25" size="0.50 0.29 0.25" euler="0 0 0.33"/>
+
+      <geom name="junction_nw_post" class="warehouse_bollard" pos="-1.29 1.05 0.38"/>
+      <geom name="junction_ne_post" class="warehouse_bollard" pos="1.34 1.18 0.38"/>
+      <geom name="junction_sw_post" class="warehouse_bollard" pos="-1.48 -1.22 0.38"/>
+      <geom name="junction_se_post" class="warehouse_bollard" pos="1.61 -1.03 0.38"/>
+      <geom name="east_aisle_post" class="warehouse_bollard" pos="4.02 1.37 0.38"/>
+      <geom name="west_aisle_post" class="warehouse_bollard" pos="-4.02 -1.40 0.38"/>
+    </body>
+  </worldbody>
+</mujoco>
